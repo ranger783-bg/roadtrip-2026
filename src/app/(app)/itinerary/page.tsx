@@ -11,8 +11,7 @@ export default async function ItineraryPage() {
   const { data: ideas } = await supabase
     .from("ideas")
     .select("*")
-    .not("pinned_day", "is", null)
     .neq("status", "skipped")
-    .order("pinned_day");
-  return <ItineraryView pinned={(ideas ?? []) as IdeaRow[]} />;
+    .order("title");
+  return <ItineraryView initialIdeas={(ideas ?? []) as IdeaRow[]} />;
 }
