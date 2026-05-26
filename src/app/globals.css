@@ -1,0 +1,66 @@
+@import "tailwindcss";
+
+@theme {
+  /* Road-trip palette: desert sand, canyon rust, pine green, big-sky blue, amber */
+  --color-sand: #faf5ec;
+  --color-sand-soft: #f3ead9;
+  --color-paper: #fffdf9;
+  --color-ink: #2b2722;
+  --color-ink-muted: #6b6258;
+  --color-ink-soft: #a99e8d;
+  --color-edge: #e7dcc8;
+  --color-edge-soft: #f0e7d6;
+
+  --color-canyon: #b5552f;
+  --color-canyon-dark: #8e3f20;
+  --color-canyon-soft: #eccdbe;
+  --color-canyon-50: #f7e8df;
+
+  --color-pine: #3c6e63;
+  --color-pine-dark: #2a5046;
+  --color-pine-light: #6b9488;
+  --color-pine-50: #e2ece9;
+
+  --color-sky: #3e7cb1;
+  --color-sky-dark: #2e5e88;
+  --color-sky-50: #e3edf5;
+
+  --color-amber: #d59a3c;
+  --color-amber-50: #f8efd9;
+
+  --font-serif: var(--font-fraunces), Georgia, "Times New Roman", serif;
+  --font-sans: var(--font-inter), system-ui, -apple-system, sans-serif;
+
+  --shadow-soft: 0 1px 2px rgba(43, 39, 34, 0.06);
+  --shadow-card: 0 1px 3px rgba(43, 39, 34, 0.08), 0 1px 2px rgba(43, 39, 34, 0.04);
+  --shadow-lift: 0 10px 30px rgba(43, 39, 34, 0.14);
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: var(--color-sand);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+}
+
+.container-prose {
+  width: 100%;
+  max-width: 72rem;
+  margin-inline: auto;
+  padding-inline: 1rem;
+}
+
+@media (min-width: 768px) {
+  .container-prose {
+    padding-inline: 1.5rem;
+  }
+}
+
+/* Leaflet marker tweaks */
+.leaflet-container {
+  font-family: var(--font-sans);
+  background: #dfe8ea;
+}
