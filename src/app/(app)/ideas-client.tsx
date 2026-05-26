@@ -77,15 +77,10 @@ export function IdeasClient({ initialIdeas, initialStars, myProfileId }: Props) 
     }
   }
 
-  const myStarred = useMemo(
-    () => new Set(stars.filter((s) => s.profile_id === myProfileId).map((s) => s.idea_id)),
-    [stars, myProfileId],
-  );
-
   const filtered = useMemo(() => {
     return ideas.filter((i) => {
       if (hideSkipped && i.status === "skipped") return false;
-      if (starredOnly && !myStarred.has(i.id)) return false;
+      if (starredOnly && !(starsByIdea.get(i.id)?.length)) return false;
       if (unscheduledOnly && i.pinned_day) return false;
       if (stopFilter && i.stop_id !== stopFilter) return false;
       if (catFilter && i.category !== catFilter) return false;
@@ -94,7 +89,7 @@ export function IdeasClient({ initialIdeas, initialStars, myProfileId }: Props) 
       if (easyOnly && !i.low_walking) return false;
       return true;
     });
-  }, [ideas, hideSkipped, starredOnly, unscheduledOnly, myStarred, stopFilter, catFilter, dogOnly, townOnly, easyOnly]);
+  }, [ideas, hideSkipped, starredOnly, unscheduledOnly, starsByIdea, stopFilter, catFilter, dogOnly, townOnly, easyOnly]);
 
   return (
     <div className="container-prose py-6 md:py-10 space-y-6">
