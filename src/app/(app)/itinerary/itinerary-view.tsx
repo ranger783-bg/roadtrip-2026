@@ -20,10 +20,22 @@ const CAT_ICON: Record<IdeaCategory, LucideIcon> = {
   fuel: Fuel, hike: Footprints, water: Waves, wildlife: Bird, forest_road: TreePine, rest: Coffee,
 };
 
+function daysOfStop(stop: Stop): string[] {
+  if (stop.nights <= 0) return [stop.arrival];
+  const out: string[] = [];
+  const [y, m, d] = stop.arrival.split("-").map(Number);
+  const start = new Date(y, m - 1, d);
+  for (let i = 0; i < stop.nights; i++) {
+    const dt = new Date(start.getTime() + i * 86400000);
+    out.push(`${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`);
+  }
+  return out;
+}
+
 export function ItineraryView({ initialIdeas }: { initialIdeas: IdeaRow[] }) {
   const [ideas, setIdeas] = useState<IdeaRow[]>(initialIdeas);
   const [tab, setTab] = useState("calendar");
-  const [selDay, setSelDay] = useState<string | null>(null);
+  const [modal, setModal] = useState<{ stop: Stop | null; day: string } | null>(null);
   const days = useMemo(() => tripDays(), []);
   const stopByDate = useMemo(() => new Map(days.map((d) => [d.date, d.stop])), [days]);
   const mainStops = STOPS.filter((s) => s.type === "main");
@@ -37,8 +49,7 @@ export function ItineraryView({ initialIdeas }: { initialIdeas: IdeaRow[] }) {
           if (p.eventType === "DELETE") return prev.filter((i) => i.id !== (p.old as Partial<IdeaRow>).id);
           const n = p.new as IdeaRow;
           if (n.status === "skipped") return prev.filter((i) => i.id !== n.id);
-          const without = prev.filter((i) => i.id !== n.id);
-          return [...without, n];
+          return [...prev.filter((i) => i.id !== n.id), n];
         });
       })
       .subscribe();
@@ -64,7 +75,7 @@ export function ItineraryView({ initialIdeas }: { initialIdeas: IdeaRow[] }) {
   }, []);
 
   useEffect(() => {
-    function onKey(e: KeyboardEvent) { if (e.key === "Escape") setSelDay(null); }
+    function onKey(e: KeyboardEvent) { if (e.key === "Escape") setModal(null); }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
@@ -75,7 +86,7 @@ export function ItineraryView({ initialIdeas }: { initialIdeas: IdeaRow[] }) {
         <div className="space-y-1">
           <p className="text-canyon text-xs font-medium uppercase tracking-widest">49 days · 15 stops</p>
           <h1 className="font-serif text-3xl md:text-4xl font-semibold text-balance">The itinerary</h1>
-          <p className="text-ink-muted text-pretty">Tap any day to pin ideas to it. Campground stops are fixed; the colors show which leg you&rsquo;re on.</p>
+          <p className="text-ink-muted text-pretty">Tap a day in the calendar — or a stop in the list — to pin ideas. Campground stops are fixed; colors show the leg.</p>
         </div>
         <Tabs value={tab} onValueChange={setTab}>
           <TabsList>
@@ -94,25 +105,36 @@ export function ItineraryView({ initialIdeas }: { initialIdeas: IdeaRow[] }) {
 
       <Tabs value={tab} onValueChange={setTab}>
         <TabsContent value="calendar">
-          <CalendarGrid days={days} byDay={byDay} onPick={setSelDay} />
+          <CalendarGrid days={days} byDay={byDay} onPick={(date) => setModal({ stop: stopByDate.get(date) ?? null, day: date })} />
         </TabsContent>
         <TabsContent value="list" className="space-y-3">
           {STOPS.map((stop) => {
             const ideasHere = stop.nights > 0 ? pinned.filter((i) => i.pinned_day! >= stop.arrival && i.pinned_day! < stop.departure) : [];
+            const tappable = stop.nights > 0;
             return (
               <article key={stop.id} className="bg-paper border border-edge rounded-lg shadow-card overflow-hidden">
                 <div className="flex">
                   <div className="w-1.5 shrink-0" style={{ background: stop.color }} />
-                  <div className="flex-1 p-4">
-                    <div className="flex items-baseline justify-between gap-2 flex-wrap">
-                      <h3 className="font-serif text-lg font-semibold flex items-center gap-2">
-                        {stop.type === "endpoint" ? <Home className="h-4 w-4 text-ink-soft" /> : null}{stop.name}
-                      </h3>
-                      <span className="text-xs text-ink-muted">{stop.nights > 0 ? `${formatDate(stop.arrival)} → ${formatDate(stop.departure)} · ${stop.nights} ${stop.nights === 1 ? "night" : "nights"}` : formatDate(stop.arrival)}</span>
-                    </div>
-                    <p className="text-sm text-ink-muted mt-1 text-pretty">{stop.blurb}</p>
-                    {ideasHere.length > 0 ? (
-                      <ul className="mt-3 space-y-1.5">
+                  <div className="flex-1">
+                    <button
+                      type="button"
+                      disabled={!tappable}
+                      onClick={() => tappable && setModal({ stop, day: stop.arrival })}
+                      className={"w-full text-left p-4 " + (tappable ? "hover:bg-sand-soft/60 cursor-pointer" : "cursor-default")}
+                    >
+                      <div className="flex items-baseline justify-between gap-2 flex-wrap">
+                        <h3 className="font-serif text-lg font-semibold flex items-center gap-2">
+                          {stop.type === "endpoint" ? <Home className="h-4 w-4 text-ink-soft" /> : null}{stop.name}
+                        </h3>
+                        <span className="text-xs text-ink-muted">{stop.nights > 0 ? `${formatDate(stop.arrival)} → ${formatDate(stop.departure)} · ${stop.nights} ${stop.nights === 1 ? "night" : "nights"}` : formatDate(stop.arrival)}</span>
+                      </div>
+                      <p className="text-sm text-ink-muted mt-1 text-pretty">{stop.blurb}</p>
+                      {tappable && (
+                        <span className="inline-flex items-center gap-1 text-xs text-canyon mt-2"><Plus className="h-3.5 w-3.5" /> Tap to pin ideas to these days</span>
+                      )}
+                    </button>
+                    {ideasHere.length > 0 && (
+                      <ul className="px-4 pb-4 -mt-1 space-y-1.5">
                         {ideasHere.slice().sort((a, b) => a.pinned_day!.localeCompare(b.pinned_day!)).map((i) => {
                           const Icon = CAT_ICON[i.category];
                           return (
@@ -128,9 +150,7 @@ export function ItineraryView({ initialIdeas }: { initialIdeas: IdeaRow[] }) {
                           );
                         })}
                       </ul>
-                    ) : stop.nights > 0 ? (
-                      <p className="text-xs text-ink-soft mt-2 italic">Nothing pinned yet — tap a day in the calendar to add.</p>
-                    ) : null}
+                    )}
                   </div>
                 </div>
               </article>
@@ -139,13 +159,12 @@ export function ItineraryView({ initialIdeas }: { initialIdeas: IdeaRow[] }) {
         </TabsContent>
       </Tabs>
 
-      {selDay && (
-        <DayModal
-          day={selDay}
-          stop={stopByDate.get(selDay) ?? null}
+      {modal && (
+        <PinModal
+          stop={modal.stop}
+          initialDay={modal.day}
           ideas={ideas}
-          pinnedHere={byDay.get(selDay) ?? []}
-          onClose={() => setSelDay(null)}
+          onClose={() => setModal(null)}
           onPin={pin}
         />
       )}
@@ -202,11 +221,15 @@ function CalendarGrid({ days, byDay, onPick }: { days: { date: string; stop: Sto
   );
 }
 
-function DayModal({ day, stop, ideas, pinnedHere, onClose, onPin }: {
-  day: string; stop: Stop | null; ideas: IdeaRow[]; pinnedHere: IdeaRow[];
+function PinModal({ stop, initialDay, ideas, onClose, onPin }: {
+  stop: Stop | null; initialDay: string; ideas: IdeaRow[];
   onClose: () => void; onPin: (id: string, day: string | null) => void;
 }) {
+  const [selDay, setSelDay] = useState(initialDay);
   const [q, setQ] = useState("");
+  const stopDays = stop && stop.nights > 0 ? daysOfStop(stop) : [initialDay];
+
+  const pinnedHere = ideas.filter((i) => i.pinned_day === selDay);
   const pinnedIds = new Set(pinnedHere.map((i) => i.id));
   const candidates = ideas
     .filter((i) => !pinnedIds.has(i.id))
@@ -219,22 +242,43 @@ function DayModal({ day, stop, ideas, pinnedHere, onClose, onPin }: {
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-ink/40 sm:p-4" onClick={onClose}>
-      <div className="bg-paper w-full sm:max-w-md sm:rounded-lg rounded-t-2xl border border-edge shadow-lift max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-paper w-full sm:max-w-md sm:rounded-lg rounded-t-2xl border border-edge shadow-lift max-h-[88vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start justify-between gap-2 p-4 border-b border-edge">
           <div>
-            <h2 className="font-serif text-xl font-semibold">{formatDate(day)}</h2>
-            {stop ? (
+            <h2 className="font-serif text-xl font-semibold">{stop ? stop.name : "Travel day"}</h2>
+            {stop && stop.nights > 0 ? (
               <span className="inline-flex items-center gap-1.5 text-sm text-ink-muted mt-0.5">
-                <span className="h-2.5 w-2.5 rounded-full" style={{ background: stop.color }} /> {stop.name}
+                <span className="h-2.5 w-2.5 rounded-full" style={{ background: stop.color }} /> {formatDate(stop.arrival)} – {formatDate(stop.departure)}
               </span>
-            ) : <span className="text-sm text-ink-soft">Travel day</span>}
+            ) : <span className="text-sm text-ink-soft">{formatDate(initialDay)}</span>}
           </div>
           <button onClick={onClose} aria-label="Close" className="text-ink-soft hover:text-ink"><X className="h-5 w-5" /></button>
         </div>
 
+        {stopDays.length > 1 && (
+          <div className="px-4 pt-3">
+            <p className="text-xs font-medium uppercase tracking-wider text-ink-muted mb-1.5">Which day?</p>
+            <div className="flex gap-1.5 overflow-x-auto pb-1">
+              {stopDays.map((d) => {
+                const cnt = ideas.filter((i) => i.pinned_day === d).length;
+                const [, mm, dd] = d.split("-").map(Number);
+                return (
+                  <button
+                    key={d}
+                    onClick={() => setSelDay(d)}
+                    className={"shrink-0 rounded-md border px-2.5 py-1 text-xs font-medium " + (selDay === d ? "bg-canyon text-paper border-canyon-dark" : "bg-paper text-ink-muted border-edge hover:border-ink-soft")}
+                  >
+                    {mm}/{dd}{cnt > 0 ? ` · ${cnt}` : ""}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         <div className="p-4 space-y-4 overflow-y-auto">
           <div>
-            <h3 className="text-xs font-medium uppercase tracking-wider text-ink-muted mb-2">Pinned this day</h3>
+            <h3 className="text-xs font-medium uppercase tracking-wider text-ink-muted mb-2">Pinned on {formatDate(selDay)}</h3>
             {pinnedHere.length === 0 ? (
               <p className="text-sm text-ink-soft">Nothing yet — add from below.</p>
             ) : (
@@ -268,7 +312,7 @@ function DayModal({ day, stop, ideas, pinnedHere, onClose, onPin }: {
                 const sameStop = i.stop_id === stop?.id;
                 return (
                   <li key={i.id}>
-                    <button onClick={() => onPin(i.id, day)} className="w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-sand-soft text-left">
+                    <button onClick={() => onPin(i.id, selDay)} className="w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-sand-soft text-left">
                       <Icon className="h-4 w-4 text-ink-soft shrink-0" />
                       <span className="flex-1 line-clamp-1">{i.title}</span>
                       {sameStop && <span className="text-[10px] text-pine">here</span>}
